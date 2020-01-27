@@ -77,8 +77,8 @@ public class MapVsMethodBenchmark {
     }
 
     @Benchmark()
-    public void directCallFinal(final DataState dataState, final Blackhole blackhole) {
-        dataState.directCallFinal.run(dataState.data);
+    public void directCallFinalInline(final DataState dataState, final Blackhole blackhole) {
+        dataState.directCallFinalInline.run(dataState.data);
         blackhole.consume(dataState.target.getCalls());
     }
 
@@ -98,7 +98,7 @@ public class MapVsMethodBenchmark {
         public CallViaMap callViaMap;
         public CallViaMapWrapper callViaMapWrapper;
         public DirectCallNotFinal directCallNotFinal;
-        public DirectCallFinal directCallFinal;
+        public DirectCallFinalInline directCallFinalInline;
         private DirectCallFinalNoInline directCallFinalNoInline;
         private Target target;
 
@@ -122,7 +122,7 @@ public class MapVsMethodBenchmark {
             callViaMap = new CallViaMap(targets);
             callViaMapWrapper = new CallViaMapWrapper(mapWrapper);
             directCallNotFinal = new DirectCallNotFinal(mapWrapper);
-            directCallFinal = new DirectCallFinal(mapWrapper);
+            directCallFinalInline = new DirectCallFinalInline(mapWrapper);
             directCallFinalNoInline = new DirectCallFinalNoInline(mapWrapper);
         }
     }
@@ -188,15 +188,16 @@ public class MapVsMethodBenchmark {
         }
     }
 
-    public static class DirectCallFinal {
+    public static class DirectCallFinalInline {
         public static final String KEY = "KEY";
 
         private final Target target;
 
-        public DirectCallFinal(MapWrapper targets) {
+        public DirectCallFinalInline(MapWrapper targets) {
             this.target = targets.getTarget(KEY);
         }
 
+        @CompilerControl(CompilerControl.Mode.INLINE)
         public void run(String... data) {
             for (String datum : data) {
                 target.call(datum);
