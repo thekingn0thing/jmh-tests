@@ -34,6 +34,7 @@ package com.github.thekingn0thing;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.CompilerControl;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
@@ -53,8 +54,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
-@BenchmarkMode(Mode.Throughput)
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Mode.AverageTime)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 public class MapVsMethodBenchmark {
 
     @Benchmark()
@@ -81,6 +82,12 @@ public class MapVsMethodBenchmark {
         blackhole.consume(dataState.target.getCalls());
     }
 
+    @Benchmark()
+    public void directCallFinalNoInline(final DataState dataState, final Blackhole blackhole) {
+        dataState.directCallFinalNoInline.run(dataState.data);
+        blackhole.consume(dataState.target.getCalls());
+    }
+
 
     @State(Scope.Thread)
     public static class DataState {
@@ -92,6 +99,7 @@ public class MapVsMethodBenchmark {
         public CallViaMapWrapper callViaMapWrapper;
         public DirectCallNotFinal directCallNotFinal;
         public DirectCallFinal directCallFinal;
+        private DirectCallFinalNoInline directCallFinalNoInline;
         private Target target;
 
         @Setup
@@ -115,6 +123,7 @@ public class MapVsMethodBenchmark {
             callViaMapWrapper = new CallViaMapWrapper(mapWrapper);
             directCallNotFinal = new DirectCallNotFinal(mapWrapper);
             directCallFinal = new DirectCallFinal(mapWrapper);
+            directCallFinalNoInline = new DirectCallFinalNoInline(mapWrapper);
         }
     }
 
@@ -195,6 +204,25 @@ public class MapVsMethodBenchmark {
         }
     }
 
+
+
+    public static class DirectCallFinalNoInline {
+        public static final String KEY = "KEY";
+
+        private final Target target;
+
+        public DirectCallFinalNoInline(MapWrapper targets) {
+            this.target = targets.getTarget(KEY);
+        }
+
+        @CompilerControl(CompilerControl.Mode.DONT_INLINE)
+        public void run(String... data) {
+            for (String datum : data) {
+                target.call(datum);
+            }
+        }
+    }
+
     public static class Target {
         public static final int INITIAL_CAPACITY = 10_000;
         private final List<Object> calls;
@@ -243,23 +271,6 @@ public class MapVsMethodBenchmark {
 
      *
 
-
-# Run complete. Total time: 00:36:13
-
-Benchmark                                Mode  Cnt  Score    Error  Units
-MapVsMethodBenchmark.callViaMap          avgt   15  0.064 ±  0.002  us/op
-MapVsMethodBenchmark.callViaMapWrapper   avgt   15  0.069 ±  0.002  us/op
-MapVsMethodBenchmark.directCallFinal     avgt   15  0.050 ±  0.001  us/op
-MapVsMethodBenchmark.directCallNotFinal  avgt   15  0.050 ±  0.001  us/op
-
-Benchmark                                 Mode  Cnt      Score      Error   Units
-MapVsMethodBenchmark.callViaMap          thrpt    9  15535.216 ±  805.108  ops/ms
-MapVsMethodBenchmark.callViaMapWrapper   thrpt    9  14225.921 ±  426.400  ops/ms
-MapVsMethodBenchmark.directCallFinal     thrpt    9  19593.651 ± 1883.142  ops/ms
-MapVsMethodBenchmark.directCallNotFinal  thrpt    9  19617.621 ± 1694.707  ops/ms
-
-Process finished with exit code 0
-
      * b) Via the Java API:
 
      *    (see the JMH homepage for possible caveats when running from IDE:
@@ -273,9 +284,9 @@ Process finished with exit code 0
                 .include(MapVsMethodBenchmark.class.getSimpleName())
                 .forks(3)
                 .warmupIterations(1)
-                .warmupTime(TimeValue.seconds(10))
-                .measurementIterations(3)
-                .measurementTime(TimeValue.seconds(30))
+                .warmupTime(TimeValue.seconds(5))
+                .measurementIterations(1)
+                .measurementTime(TimeValue.seconds(1))
                 .build();
 
         new Runner(opt).run();
